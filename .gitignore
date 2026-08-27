@@ -1,0 +1,6 @@
+# Il repository pubblico contiene soltanto l'app distribuibile e la documentazione essenziale.
+*
+!.gitignore
+!index.html
+!README.md
+
