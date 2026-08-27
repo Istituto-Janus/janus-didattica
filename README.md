@@ -6,7 +6,7 @@ Applicazione web dell'Istituto Janus per costruire un piano didattico personaliz
 
 La versione pubblicata con GitHub Pages funziona direttamente dal browser: non richiede installazione, Terminale o server locale.
 
-1. Aprire l'indirizzo GitHub Pages dell'app.
+1. Aprire [Janus Didattica](https://istituto-janus.github.io/janus-didattica/).
 2. Connettere il proprio account Google Workspace dell'Istituto Janus.
 3. Scegliere l'indirizzo di studi e compilare i parametri del percorso.
 4. Controllare la capacità e la percentuale di copertura.
@@ -21,7 +21,7 @@ L'app è destinata agli account Google Workspace autorizzati dell'organizzazione
 ## Sicurezza
 
 - Il client secret OAuth non deve mai essere pubblicato.
-- Il client ID OAuth web è un identificatore pubblico e può essere configurato nell'app.
+- Il client ID OAuth web è un identificatore pubblico ed è già configurato nell'app; il client secret non è incluso.
 - L'ambito Google richiesto è esclusivamente `spreadsheets.readonly`.
 - Non inserire dati reali degli studenti nei test o nel repository.
 
