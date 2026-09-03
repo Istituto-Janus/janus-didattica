@@ -545,9 +545,10 @@
       const isForeignLanguageDiscipline = value => /^(lingua inglese|lingua francese|lingua spagnola|lingua tedesca|seconda lingua|lingua e cultura straniera)/i.test(safeText(value));
       const languageDisciplineFor = (schoolType, language) => {
         const key = safeText(language).toLocaleLowerCase('it-IT');
-        if (schoolType === 'Liceo Linguistico') return `lingua ${key}`;
+        const adjective = { francese: 'francese', spagnolo: 'spagnola', tedesco: 'tedesca' }[key] || key;
+        if (schoolType === 'Liceo Linguistico') return `lingua ${adjective}`;
         if (schoolType === 'Amministrazione, Finanza e Marketing') return `seconda lingua comunitaria — ${key} (variante)`;
-        if (schoolType === 'Turismo') return `lingua ${key} — variante turismo`;
+        if (schoolType === 'Turismo') return `lingua ${adjective} — variante turismo`;
         if (schoolType === 'Servizi per la sanità e l’assistenza sociale') return `seconda lingua straniera — ${key}`;
         if (schoolType === 'Enogastronomia e ospitalità alberghiera') return `seconda lingua straniera — ${key}`;
         return '';
