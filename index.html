@@ -125,6 +125,18 @@
       border: 1px solid #d7e5f5;
     }
     .weights.visible { display: block; }
+    .language-panel {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 18px;
+      border-radius: 12px;
+      background: #f7faff;
+      border: 1px solid #d7e5f5;
+    }
+    .language-panel.visible { display: block; }
+    .language-title { margin-bottom: 14px; }
+    .language-title p { margin: 3px 0 0; color: var(--muted); font-size: .79rem; }
+    .language-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .weights-title { display: flex; justify-content: space-between; gap: 15px; align-items: center; margin-bottom: 14px; }
     .weights-title p { margin: 3px 0 0; color: var(--muted); font-size: .79rem; }
     .total-badge { white-space: nowrap; font-size: .78rem; font-weight: 760; color: var(--success); background: var(--success-soft); padding: 6px 9px; border-radius: 99px; }
@@ -220,7 +232,8 @@
       main { padding-inline: 12px; }
       .form-card { padding: 22px 17px; }
       .grid, .weight-grid { grid-template-columns: 1fr; }
-      .field.full, .weights, .capacity-note { grid-column: auto; }
+      .field.full, .weights, .language-panel, .capacity-note { grid-column: auto; }
+      .language-grid { grid-template-columns: 1fr; }
       .actions { align-items: stretch; flex-direction: column-reverse; }
       .workspace-row { align-items: stretch; flex-direction: column; }
       .primary { width: 100%; }
@@ -309,6 +322,25 @@
             <p class="error" id="courseError"></p>
           </div>
 
+          <div class="language-panel" id="languagePanel" aria-live="polite">
+            <div class="language-title">
+              <h3>Lingue del percorso</h3>
+              <p id="languageDescription">L’inglese è sempre previsto. Seleziona la seconda lingua effettivamente attivata.</p>
+            </div>
+            <div class="language-grid">
+              <div class="field" id="secondLanguageField">
+                <label for="secondLanguage" id="secondLanguageLabel">Seconda lingua <span class="required">*</span></label>
+                <select id="secondLanguage" name="secondLanguage"></select>
+                <p class="error" id="secondLanguageError"></p>
+              </div>
+              <div class="field" id="thirdLanguageField" hidden>
+                <label for="thirdLanguage">Terza lingua <span class="required">*</span></label>
+                <select id="thirdLanguage" name="thirdLanguage"></select>
+                <p class="error" id="thirdLanguageError"></p>
+              </div>
+            </div>
+          </div>
+
           <div class="weights" id="weightsPanel" aria-live="polite">
             <div class="weights-title">
               <div><h3>Distribuzione tra annualità</h3><p>Bilancia la priorità dei contenuti. Il totale deve essere 100%.</p></div>
@@ -343,7 +375,7 @@
               <div class="field">
                 <label for="googleClientId">ID client OAuth per applicazione web</label>
                 <input id="googleClientId" autocomplete="off" placeholder="es. 000000000000-xxxxxxxx.apps.googleusercontent.com">
-                <p class="hint">Già configurato per GitHub Pages e localhost. Questo campo resta disponibile soltanto per eventuali modifiche amministrative future.</p>
+                <p class="hint">Già configurato per GitHub Pages. Questo campo resta disponibile soltanto per eventuali modifiche amministrative future.</p>
               </div>
             </details>
           </div>
@@ -404,6 +436,7 @@
           <p class="summary-label">Percorso</p>
           <p class="summary-value" id="previewCourse">Liceo Scientifico · Classe da selezionare</p>
           <p class="summary-sub" id="previewWeights">Percorso annuale</p>
+          <p class="summary-sub" id="previewLanguages"></p>
         </div>
         <div class="summary-group">
           <p class="summary-label">Periodo</p>
@@ -444,19 +477,19 @@
       const CLIENT_ID_KEY = 'janus.googleOAuthClientId';
       const DEFAULT_GOOGLE_CLIENT_ID = '51691274162-gn7idujngoinm6mdq36a9gb4d4ps6q5j.apps.googleusercontent.com';
       const WORKSPACE_CATALOGS = {
-        'Liceo Scientifico': '1sINtwD1KkZ1DgrCpgpvsWGr4SZcosI49RFqUrYjXKrA',
-        'Liceo Scientifico Sportivo': '1c9jsaXsGxsByWwoJ8QRZtjXmJEE53K7cCS3EEgp87Os',
-        'Liceo Scientifico — Scienze Applicate': '1xL8NwCmXzFArG_HfIu6b2gsFK-RELZnJt_ie3IscDSs',
-        'Liceo Classico': '1OMnIZSJV2ZskqsyyScelw6as6lNyk7ZFRtB5TG1BX3Y',
-        'Liceo Linguistico': '1T8fCB0fjRRlwLi7EtE_dbfSsOhE2k01ZjZlpv46HvHY',
-        'Liceo delle Scienze Umane': '1mQZz1_qVSEiCBKjxv9MHzbJ_SvytqLqNXkD8M4FGaCQ',
-        'Liceo Economico-Sociale': '1tYNmI4fBQvpRFZJJcqwf0B_3HPAX3a8o4hsV_a08IRw',
-        'Informatica e Telecomunicazioni — articolazione Informatica': '1VPrJhJqdCC0VlzHW8iwpdAEJoF8Vr8xBw_eZoePzO5E',
-        'Amministrazione, Finanza e Marketing': '1Bq2zMopsfaOZOy2hZDtfnF7V2_eGjKxM2rn7BHqXKjU',
-        'Turismo': '1jFefwX-aioHPEL6agEJcJ0U3lk63p8yeVhL91nF3uuo',
-        'Meccanica, Meccatronica ed Energia — articolazione Meccanica e Meccatronica': '1gruhvdVg9QF9gzkE6pteNcpH_-J7ycESoPLgtocsjns',
-        'Servizi per la sanità e l’assistenza sociale': '1B4ATVpJ--TrE4T0pXEo7AEpJGkrAtggPnFSkxSecpCg',
-        'Enogastronomia e ospitalità alberghiera': '1YF16XXMrCrFTXJaTcQ1hpjTpZR0FcEmWY6JqTecRhrU'
+        'Liceo Scientifico': '1G8NcTGJpsuTpXaw2hfj0PRZ6Lq-o1LeZwRALJmrH4Eo',
+        'Liceo Scientifico Sportivo': '1TTCfn-Kn4uQT5LqQC7pdXWKSbgHRjQoK94GRVZDjLlY',
+        'Liceo Scientifico — Scienze Applicate': '1BzAS-Kwb0qhjkkY6IaejFYB6Q3eBiAosRnuaRsp5Cvc',
+        'Liceo Classico': '1zFpspP8uXeONVmiQGAYxb_H8-CVtZNDjRur1ig2fX8U',
+        'Liceo Linguistico': '1wAiHmys5_TpQMXHMypHc8NR-weyQHP_LSpw47qnEcUY',
+        'Liceo delle Scienze Umane': '17HdGCXMA21NjD_18XEXOsA4-KTb-Ne3KMpBu7WspOC4',
+        'Liceo Economico-Sociale': '1ZJfR-WNNS7E04sgVGvyITSMqRWiR-zNPv7HE51-dDOo',
+        'Informatica e Telecomunicazioni — articolazione Informatica': '1_cXD3_sf5MdTO-xbYfTvNbBOH7rQoIvRE4wn1BTpkxQ',
+        'Amministrazione, Finanza e Marketing': '1QUZfYSkK-dh_ieOrD8Ez7DmA28XeC6Rxb-976cXxIl8',
+        'Turismo': '1zY_S9NjjydJbCS0vfQZieG8LNpxZrlYuFzu2qVHqOlw',
+        'Meccanica, Meccatronica ed Energia — articolazione Meccanica e Meccatronica': '1BeFxrHo8mpphYR-rJ4fhEu1zTfPYDOjqdhwHcPI_vDw',
+        'Servizi per la sanità e l’assistenza sociale': '1FeBdEVjHkD6OGXt6srT1J2YhrkSCjGwliicIprwjdBo',
+        'Enogastronomia e ospitalità alberghiera': '10N6byAFVZ0JxH4_m-v-kGinzmM2dg3i7S9U1nk3POM4'
       };
       let googleAccessToken = '';
       let catalogState = { source: 'none', loading: false, schoolType: '', updatedAt: null, error: '' };
@@ -468,9 +501,13 @@
         course: document.getElementById('course'), startDate: document.getElementById('startDate'),
         endDate: document.getElementById('endDate'), lessonsPerDay: document.getElementById('lessonsPerDay'),
         daysPerWeek: document.getElementById('daysPerWeek'), weightFirst: document.getElementById('weightFirst'),
-        weightSecond: document.getElementById('weightSecond'), googleClientId: document.getElementById('googleClientId')
+        weightSecond: document.getElementById('weightSecond'), googleClientId: document.getElementById('googleClientId'),
+        secondLanguage: document.getElementById('secondLanguage'), thirdLanguage: document.getElementById('thirdLanguage')
       };
       const weightsPanel = document.getElementById('weightsPanel');
+      const languagePanel = document.getElementById('languagePanel');
+      const thirdLanguageField = document.getElementById('thirdLanguageField');
+      const languageDescription = document.getElementById('languageDescription');
       const totalBadge = document.getElementById('totalBadge');
       const notice = document.getElementById('notice');
       const workspaceStatus = document.getElementById('workspaceStatus');
@@ -489,6 +526,66 @@
         if (fields.course.value === 'Solo 5ª') return ['5ª'];
         return fields.course.value ? [fields.course.value] : [];
       };
+      const LANGUAGE_OPTIONS = ['Francese', 'Spagnolo', 'Tedesco'];
+      const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Turismo', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
+      const LANGUAGE_COURSE_OPTIONS = {
+        'Liceo Economico-Sociale': LANGUAGE_OPTIONS,
+        'Amministrazione, Finanza e Marketing': ['Francese', 'Spagnolo'],
+        'Turismo': LANGUAGE_OPTIONS,
+        'Servizi per la sanità e l’assistenza sociale': ['Francese', 'Spagnolo'],
+        'Enogastronomia e ospitalità alberghiera': ['Francese', 'Spagnolo']
+      };
+      const languageCourse = () => fields.schoolType.value === 'Liceo Linguistico' || TWO_LANGUAGE_COURSES.has(fields.schoolType.value);
+      const isLinguistic = () => fields.schoolType.value === 'Liceo Linguistico';
+      const selectedLanguages = () => {
+        if (!languageCourse()) return [];
+        return ['Inglese', safeText(fields.secondLanguage?.value), ...(isLinguistic() ? [safeText(fields.thirdLanguage?.value)] : [])].filter(Boolean);
+      };
+      const languageDiscipline = value => safeText(value).toLocaleLowerCase('it-IT');
+      const isForeignLanguageDiscipline = value => /^(lingua inglese|lingua francese|lingua spagnola|lingua tedesca|seconda lingua|lingua e cultura straniera)/i.test(safeText(value));
+      const languageDisciplineFor = (schoolType, language) => {
+        const key = safeText(language).toLocaleLowerCase('it-IT');
+        if (schoolType === 'Liceo Linguistico') return `lingua ${key}`;
+        if (schoolType === 'Amministrazione, Finanza e Marketing') return `seconda lingua comunitaria — ${key} (variante)`;
+        if (schoolType === 'Turismo') return `lingua ${key} — variante turismo`;
+        if (schoolType === 'Servizi per la sanità e l’assistenza sociale') return `seconda lingua straniera — ${key}`;
+        if (schoolType === 'Enogastronomia e ospitalità alberghiera') return `seconda lingua straniera — ${key}`;
+        return '';
+      };
+      const allowedLanguageOptions = () => isLinguistic() ? LANGUAGE_OPTIONS : (LANGUAGE_COURSE_OPTIONS[fields.schoolType.value] || []);
+      function populateLanguageSelect(select, options, placeholder, selected = '') {
+        if (!select) return;
+        select.innerHTML = '';
+        const empty = document.createElement('option'); empty.value = ''; empty.textContent = placeholder; select.appendChild(empty);
+        options.forEach(option => { const item = document.createElement('option'); item.value = option; item.textContent = option; select.appendChild(item); });
+        select.value = options.includes(selected) ? selected : '';
+      }
+      function updateLanguageFields() {
+        const visible = languageCourse();
+        languagePanel?.classList.toggle('visible', visible);
+        if (!visible) {
+          if (fields.secondLanguage) fields.secondLanguage.value = '';
+          if (fields.thirdLanguage) fields.thirdLanguage.value = '';
+          fields.secondLanguage?.removeAttribute('required'); fields.thirdLanguage?.removeAttribute('required');
+          return;
+        }
+        const options = allowedLanguageOptions();
+        const previousSecond = fields.secondLanguage?.value || '';
+        populateLanguageSelect(fields.secondLanguage, options, 'Seleziona la seconda lingua', previousSecond);
+        fields.secondLanguage?.setAttribute('required', '');
+        if (isLinguistic()) {
+          languageDescription.textContent = 'L’inglese è sempre previsto. Seleziona le altre due lingue effettivamente attivate.';
+          thirdLanguageField.hidden = false;
+          const previousThird = fields.thirdLanguage?.value || '';
+          populateLanguageSelect(fields.thirdLanguage, options.filter(option => option !== fields.secondLanguage.value), 'Seleziona la terza lingua', previousThird);
+          fields.thirdLanguage?.setAttribute('required', '');
+        } else {
+          languageDescription.textContent = 'L’inglese è sempre previsto. Seleziona la seconda lingua effettivamente attivata.';
+          thirdLanguageField.hidden = true;
+          if (fields.thirdLanguage) fields.thirdLanguage.value = '';
+          fields.thirdLanguage?.removeAttribute('required');
+        }
+      }
       const parseLocalDate = value => value ? new Date(value + 'T12:00:00') : null;
       const isoDate = date => {
         const year = date.getFullYear();
@@ -561,7 +658,7 @@
       }
     
       async function requestGoogleToken() {
-        if (location.protocol === 'file:') throw new Error('L’accesso Google richiede GitHub Pages o un indirizzo localhost autorizzato; non può partire direttamente da file://.');
+        if (location.protocol === 'file:') throw new Error('L’accesso Google richiede la versione pubblicata su GitHub Pages; non può partire direttamente da file://.');
         const clientId = safeText(fields.googleClientId?.value) || DEFAULT_GOOGLE_CLIENT_ID;
         if (!clientId) throw new Error('ID client OAuth Google non configurato. Contatta l’amministratore.');
         if (typeof localStorage !== 'undefined') localStorage.setItem(CLIENT_ID_KEY, clientId);
@@ -641,7 +738,18 @@
     
       function courseLessons() {
         const years = selectedYears();
-        return CATALOG.filter(row => years.includes(row.anno));
+        const selected = selectedLanguages();
+        if (languageCourse() && selected.length < (isLinguistic() ? 3 : 2)) return [];
+        const languages = selected.map(language => languageDisciplineFor(fields.schoolType.value, language));
+        return CATALOG.filter(row => {
+          if (!years.includes(row.anno)) return false;
+          if (!languageCourse() || !languages.length) return true;
+          const discipline = languageDiscipline(row.disciplina);
+          if (!isForeignLanguageDiscipline(row.disciplina)) return true;
+          if (fields.schoolType.value === 'Liceo Economico-Sociale') return true;
+          if (discipline === 'lingua inglese') return true;
+          return languages.includes(discipline);
+        });
       }
     
       function updateWeights() {
@@ -682,6 +790,8 @@
         document.getElementById('previewStudent').textContent = fullName || 'Da compilare';
         document.getElementById('previewTutor').textContent = `Tutor: ${safeText(fields.tutorName.value) || 'da indicare'}`;
         document.getElementById('previewCourse').textContent = `${fields.schoolType.value} · ${fields.course.value || 'Classe da selezionare'}`;
+        const previewLanguages = document.getElementById('previewLanguages');
+        if (previewLanguages) previewLanguages.textContent = languageCourse() ? `Lingue: ${selectedLanguages().join(' · ') || 'da selezionare'}` : '';
         const years = selectedYears();
         document.getElementById('previewWeights').textContent = years.length === 2 ? `${years[0]} ${fields.weightFirst.value || 0}% · ${years[1]} ${fields.weightSecond.value || 0}%` : 'Percorso annuale';
     
@@ -743,6 +853,16 @@
         setError('lessonsPerDay', dailyValid ? '' : 'Inserisci un numero intero tra 1 e 12.');
         setError('daysPerWeek', daysValid ? '' : 'Inserisci un numero intero tra 2 e 7: un giorno sarà riservato al ripasso.');
         valid = valid && dailyValid && daysValid;
+        if (languageCourse()) {
+          const secondValid = Boolean(safeText(fields.secondLanguage.value));
+          setError('secondLanguage', secondValid ? '' : 'Seleziona la seconda lingua.');
+          valid = valid && secondValid;
+          if (isLinguistic()) {
+            const thirdValid = Boolean(safeText(fields.thirdLanguage.value)) && fields.thirdLanguage.value !== fields.secondLanguage.value;
+            setError('thirdLanguage', thirdValid ? '' : 'Seleziona una terza lingua diversa dalla seconda.');
+            valid = valid && thirdValid;
+          }
+        }
         if (fields.startDate.value && fields.endDate.value && fields.endDate.value < fields.startDate.value) {
           setError('endDate', 'La data di fine deve essere successiva alla data di inizio.'); valid = false;
         }
@@ -894,15 +1014,15 @@
         const capacity = calculateCapacity();
         return {
           student: { firstName: safeText(fields.studentName.value), lastName: safeText(fields.studentSurname.value) },
-          tutor: safeText(fields.tutorName.value), schoolType: fields.schoolType.value, course: fields.course.value,
+          tutor: safeText(fields.tutorName.value), schoolType: fields.schoolType.value, course: fields.course.value, languages: selectedLanguages(),
           years, dates: { start: fields.startDate.value, end: fields.endDate.value }, capacity,
           annualWeights: years.length === 2 ? { [years[0]]: Number(fields.weightFirst.value), [years[1]]: Number(fields.weightSecond.value) } : null
         };
       }
     
       function buildStudyPlan(config) {
-        const requested = CATALOG.filter(row => config.years.includes(row.anno));
-        const selectionSeed = `${config.schoolType}|${config.course}|${config.dates.start}|${config.dates.end}|${config.capacity.total}`;
+        const requested = courseLessons();
+        const selectionSeed = `${config.schoolType}|${config.course}|${(config.languages || []).join(',')}|${config.dates.start}|${config.dates.end}|${config.capacity.total}`;
         const selected = selectForCapacity(requested, config.capacity.total, config.annualWeights, selectionSeed);
         const schedule = distributeLessons(selected, config.capacity.instructionDates, config.capacity.daily);
         const weekNumbers = new Map(config.capacity.reviewDates.map((date, index) => [weekKey(date), index + 1]));
@@ -961,7 +1081,7 @@
         const status = plan.selected.length === plan.requested.length ? 'PROGRAMMA COMPLETO' : 'PROGRAMMA RIDOTTO PER CAPACITÀ';
         const summaryRows = [
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
-          ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
+          ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
           ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)], ['Giornate di ripasso', String(plan.reviews.length)],
           ['Capacità nuove lezioni', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti totali`],
           ['Lezioni richieste', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
@@ -1267,7 +1387,7 @@
         const coverage = plan.requested.length ? Math.round(plan.selected.length / plan.requested.length * 1000) / 10 : 0;
         const summaryRows = [
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
-          ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
+          ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
           ['Settimane con attività', String(config.capacity.reviewDates.length)], ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)],
           ['Giornate di ripasso', String(plan.reviews.length)], ['Capacità', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti`],
           ['Lezioni complessive', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
@@ -1331,7 +1451,8 @@
         const rels = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>';
         const documentRels = '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/cover.png"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/coverage.svg"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/priorities.svg"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/subjects.svg"/><Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/><Relationship Id="rId8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>';
         const fullName = `${plan.config.student.firstName} ${plan.config.student.lastName}`.trim();
-        const header = `<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tbl><w:tblPr><w:tblW w:w="9300" w:type="dxa"/><w:tblBorders><w:bottom w:val="single" w:sz="6" w:color="788CB4"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="6500"/><w:gridCol w:w="2800"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="6500" w:type="dxa"/></w:tcPr>${mParagraph(`${fullName} · ${plan.config.schoolType} · ${plan.config.course}`, { bold: true, color: '252846', size: 16 })}</w:tc><w:tc><w:tcPr><w:tcW w:w="2800" w:type="dxa"/></w:tcPr>${mParagraph('Manuale operativo', { align: 'right', color: '566487', size: 15 })}</w:tc></w:tr></w:tbl></w:hdr>`;
+        const languageSuffix = plan.config.languages?.length ? ` · ${plan.config.languages.join(' · ')}` : '';
+        const header = `<?xml version="1.0" encoding="UTF-8"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:tbl><w:tblPr><w:tblW w:w="9300" w:type="dxa"/><w:tblBorders><w:bottom w:val="single" w:sz="6" w:color="788CB4"/></w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="6500"/><w:gridCol w:w="2800"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w="6500" w:type="dxa"/></w:tcPr>${mParagraph(`${fullName} · ${plan.config.schoolType} · ${plan.config.course}${languageSuffix}`, { bold: true, color: '252846', size: 16 })}</w:tc><w:tc><w:tcPr><w:tcW w:w="2800" w:type="dxa"/></w:tcPr>${mParagraph('Manuale operativo', { align: 'right', color: '566487', size: 15 })}</w:tc></w:tr></w:tbl></w:hdr>`;
         const footer = '<?xml version="1.0" encoding="UTF-8"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="566487"/><w:sz w:val="15"/></w:rPr><w:t xml:space="preserve">Janus · Manuale operativo dello studente · Pagina </w:t></w:r><w:fldSimple w:instr=" PAGE "><w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:color w:val="566487"/><w:sz w:val="15"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple></w:p></w:ftr>';
         const now = new Date().toISOString();
         const core = `<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Manuale operativo dello studente</dc:title><dc:creator>Janus</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`;
@@ -1382,9 +1503,11 @@
         if (event.target === fields.weightFirst || event.target === fields.weightSecond) validateWeights(false);
         notice.className = 'notice'; updatePreview();
       });
-      fields.course.addEventListener('change', () => { updateWeights(); updatePreview(); });
+      fields.course.addEventListener('change', () => { updateLanguageFields(); updateWeights(); updatePreview(); });
+      fields.secondLanguage?.addEventListener('change', () => { updateLanguageFields(); updatePreview(); });
+      fields.thirdLanguage?.addEventListener('change', updatePreview);
       fields.schoolType.addEventListener('change', async () => {
-        useEmbeddedFallback(); updatePreview();
+        updateLanguageFields(); useEmbeddedFallback(); updatePreview();
         if (googleAccessToken) await loadSelectedCatalog().catch(error => console.warn(error));
       });
       if (connectWorkspaceBtn) connectWorkspaceBtn.addEventListener('click', connectWorkspace);
@@ -1422,7 +1545,7 @@
         const savedClientId = typeof localStorage !== 'undefined' ? localStorage.getItem(CLIENT_ID_KEY) : '';
         fields.googleClientId.value = savedClientId || DEFAULT_GOOGLE_CLIENT_ID;
       }
-      useEmbeddedFallback(); updateWeights(); updatePreview();
+      updateLanguageFields(); useEmbeddedFallback(); updateWeights(); updatePreview();
     })();
     
   </script>
