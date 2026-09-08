@@ -529,7 +529,7 @@
       const LANGUAGE_OPTIONS = ['Francese', 'Spagnolo', 'Tedesco'];
       const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Turismo', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
       const LANGUAGE_COURSE_OPTIONS = {
-        'Liceo Economico-Sociale': LANGUAGE_OPTIONS,
+        'Liceo Economico-Sociale': ['Francese', 'Spagnolo'],
         'Amministrazione, Finanza e Marketing': ['Francese', 'Spagnolo'],
         'Turismo': LANGUAGE_OPTIONS,
         'Servizi per la sanità e l’assistenza sociale': ['Francese', 'Spagnolo'],
@@ -553,6 +553,7 @@
         if (schoolType === 'Enogastronomia e ospitalità alberghiera') return `seconda lingua straniera — ${key}`;
         return '';
       };
+      const languageCatalogCode = language => ({ Inglese: 'ING', Francese: 'FRA', Spagnolo: 'SPA', Tedesco: 'TED' }[safeText(language)] || '');
       const allowedLanguageOptions = () => isLinguistic() ? LANGUAGE_OPTIONS : (LANGUAGE_COURSE_OPTIONS[fields.schoolType.value] || []);
       function populateLanguageSelect(select, options, placeholder, selected = '') {
         if (!select) return;
@@ -747,7 +748,10 @@
           if (!languageCourse() || !languages.length) return true;
           const discipline = languageDiscipline(row.disciplina);
           if (!isForeignLanguageDiscipline(row.disciplina)) return true;
-          if (fields.schoolType.value === 'Liceo Economico-Sociale') return true;
+          if (fields.schoolType.value === 'Liceo Economico-Sociale') {
+            const selectedCodes = new Set(selected.map(languageCatalogCode));
+            return [...selectedCodes].some(code => code && safeText(row.id).startsWith(`LES-${code}-`));
+          }
           if (discipline === 'lingua inglese') return true;
           return languages.includes(discipline);
         });
