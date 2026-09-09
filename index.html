@@ -300,6 +300,8 @@
               <option value="Liceo Economico-Sociale">Liceo Economico-Sociale</option>
               <option value="Informatica e Telecomunicazioni — articolazione Informatica">Informatica e Telecomunicazioni — articolazione Informatica</option>
               <option value="Amministrazione, Finanza e Marketing">Amministrazione, Finanza e Marketing</option>
+              <option value="Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)">Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)</option>
+              <option value="Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)">Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)</option>
               <option value="Turismo">Turismo</option>
               <option value="Meccanica, Meccatronica ed Energia — articolazione Meccanica e Meccatronica">Meccanica, Meccatronica ed Energia — articolazione Meccanica e Meccatronica</option>
               <option value="Servizi per la sanità e l’assistenza sociale">Servizi per la sanità e l’assistenza sociale</option>
@@ -486,6 +488,8 @@
         'Liceo Economico-Sociale': '1ZJfR-WNNS7E04sgVGvyITSMqRWiR-zNPv7HE51-dDOo',
         'Informatica e Telecomunicazioni — articolazione Informatica': '1_cXD3_sf5MdTO-xbYfTvNbBOH7rQoIvRE4wn1BTpkxQ',
         'Amministrazione, Finanza e Marketing': '1QUZfYSkK-dh_ieOrD8Ez7DmA28XeC6Rxb-976cXxIl8',
+        'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)': '13BAqeldNPQi9EinxTw8GwJg1PHsNg-4EPMIRsmnryYw',
+        'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)': '18O05k2ysB2OrrzC7geK1gCreNTd01NGXi8OeNy3JG6Y',
         'Turismo': '1zY_S9NjjydJbCS0vfQZieG8LNpxZrlYuFzu2qVHqOlw',
         'Meccanica, Meccatronica ed Energia — articolazione Meccanica e Meccatronica': '1BeFxrHo8mpphYR-rJ4fhEu1zTfPYDOjqdhwHcPI_vDw',
         'Servizi per la sanità e l’assistenza sociale': '1FeBdEVjHkD6OGXt6srT1J2YhrkSCjGwliicIprwjdBo',
@@ -527,10 +531,12 @@
         return fields.course.value ? [fields.course.value] : [];
       };
       const LANGUAGE_OPTIONS = ['Francese', 'Spagnolo', 'Tedesco'];
-      const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Turismo', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
+      const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)', 'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)', 'Turismo', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
       const LANGUAGE_COURSE_OPTIONS = {
         'Liceo Economico-Sociale': ['Francese', 'Spagnolo'],
         'Amministrazione, Finanza e Marketing': ['Francese', 'Spagnolo'],
+        'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)': ['Francese', 'Spagnolo'],
+        'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)': ['Francese', 'Spagnolo'],
         'Turismo': LANGUAGE_OPTIONS,
         'Servizi per la sanità e l’assistenza sociale': ['Francese', 'Spagnolo'],
         'Enogastronomia e ospitalità alberghiera': ['Francese', 'Spagnolo']
@@ -547,7 +553,7 @@
         const key = safeText(language).toLocaleLowerCase('it-IT');
         const adjective = { francese: 'francese', spagnolo: 'spagnola', tedesco: 'tedesca' }[key] || key;
         if (schoolType === 'Liceo Linguistico') return `lingua ${adjective}`;
-        if (schoolType === 'Amministrazione, Finanza e Marketing') return `seconda lingua comunitaria — ${key} (variante)`;
+        if (['Amministrazione, Finanza e Marketing', 'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)', 'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)'].includes(schoolType)) return `seconda lingua comunitaria — ${key} (variante)`;
         if (schoolType === 'Turismo') return `lingua ${adjective} — variante turismo`;
         if (schoolType === 'Servizi per la sanità e l’assistenza sociale') return `seconda lingua straniera — ${key}`;
         if (schoolType === 'Enogastronomia e ospitalità alberghiera') return `seconda lingua straniera — ${key}`;
