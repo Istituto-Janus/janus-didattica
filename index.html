@@ -729,8 +729,12 @@
       }
     
       function splitStudyDates(studyDates) {
+        const initialReviewDates = ['1ª', '1ª/2ª'].includes(fields.course.value) ? [] : studyDates.slice(0, 10);
+        const finalStart = Math.max(initialReviewDates.length, studyDates.length - 10);
+        const finalReviewDates = studyDates.slice(finalStart);
+        const coreDates = studyDates.slice(initialReviewDates.length, finalStart);
         const weeks = new Map();
-        studyDates.forEach(date => {
+        coreDates.forEach(date => {
           const start = new Date(date);
           const day = start.getDay();
           start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
@@ -738,10 +742,10 @@
           if (!weeks.has(key)) weeks.set(key, []);
           weeks.get(key).push(new Date(date));
         });
-        const reviewDates = [...weeks.values()].map(dates => dates[dates.length - 1]);
-        const reviewKeys = new Set(reviewDates.map(isoDate));
-        const instructionDates = studyDates.filter(date => !reviewKeys.has(isoDate(date)));
-        return { instructionDates, reviewDates };
+        const weeklyReviewDates = [...weeks.values()].map(dates => dates[dates.length - 1]);
+        const reviewKeys = new Set(weeklyReviewDates.map(isoDate));
+        const instructionDates = coreDates.filter(date => !reviewKeys.has(isoDate(date)));
+        return { instructionDates, reviewDates: [...initialReviewDates, ...weeklyReviewDates, ...finalReviewDates], weeklyReviewDates, initialReviewDates, finalReviewDates };
       }
     
       function courseLessons() {
@@ -792,8 +796,8 @@
         const daily = Number(fields.lessonsPerDay.value) || 0;
         const daysPerWeek = Number(fields.daysPerWeek.value) || 0;
         const studyDates = getStudyDates(fields.startDate.value, fields.endDate.value, daysPerWeek);
-        const { instructionDates, reviewDates } = splitStudyDates(studyDates);
-        return { daily, daysPerWeek, studyDates, instructionDates, reviewDates, total: instructionDates.length * daily, weekly: daily * Math.max(0, daysPerWeek - 1) };
+        const { instructionDates, reviewDates, weeklyReviewDates, initialReviewDates, finalReviewDates } = splitStudyDates(studyDates);
+        return { daily, daysPerWeek, studyDates, instructionDates, reviewDates, weeklyReviewDates, initialReviewDates, finalReviewDates, total: instructionDates.length * daily, weekly: daily * Math.max(0, daysPerWeek - 1) };
       }
     
       function updatePreview() {
@@ -821,7 +825,7 @@
         const engineNote = document.getElementById('engineNote');
         if (engineNote) {
           const sourceCopy = catalogState.source === 'workspace' ? 'Foglio Google Workspace aggiornato' : catalogState.source === 'fallback' ? 'catalogo locale di sicurezza (solo Liceo Scientifico)' : 'catalogo non caricato';
-          engineNote.innerHTML = `<strong>Motore attivo:</strong> ${sourceCopy} · ${formatNumber(CATALOG.length)} lezioni disponibili · alternanza delle materie · un giorno di ripasso ogni settimana.`;
+          engineNote.innerHTML = `<strong>Motore attivo:</strong> ${sourceCopy} · ${formatNumber(CATALOG.length)} lezioni disponibili · ripasso iniziale/finale e alternanza delle materie.`;
         }
         status.className = 'coverage-status';
         bar.className = '';
@@ -950,8 +954,8 @@
         return selections.slice(0, capacity).sort(prioritySort);
       }
     
-      function distributeLessons(selected, studyDates, lessonsPerDay) {
-        if (!selected.length || !studyDates.length) return [];
+      function distributeLessons(selected, studyDates, lessonsPerDay, config, requested = selected) {
+        if ((!selected.length && !requested.length) || !studyDates.length) return [];
         const queues = new Map();
         selected.forEach(lesson => {
           const key = lesson.disciplina || 'Altra disciplina';
@@ -960,34 +964,69 @@
         });
         queues.forEach(queue => queue.sort((a, b) => a.anno.localeCompare(b.anno, 'it') || (Number(a.ordine) || 99999) - (Number(b.ordine) || 99999) || a.id.localeCompare(b.id)));
     
-        const dailyTargets = studyDates.map((_, index) => Math.floor((index + 1) * selected.length / studyDates.length) - Math.floor(index * selected.length / studyDates.length));
         const lastUsed = new Map();
         const schedule = [];
         let sequence = 0;
         let previousDiscipline = '';
-    
-        studyDates.forEach((date, dayIndex) => {
+        const slots = [];
+        studyDates.forEach(date => { for (let slot = 1; slot <= lessonsPerDay; slot++) slots.push({ date: new Date(date), slot }); });
+        const weeks = new Map();
+        slots.forEach(slot => { const key = weekKey(slot.date); if (!weeks.has(key)) weeks.set(key, []); weeks.get(key).push(slot); });
+        const requestedCounts = new Map();
+        requested.forEach(lesson => requestedCounts.set(lesson.disciplina, (requestedCounts.get(lesson.disciplina) || 0) + 1));
+        const selectedCounts = new Map();
+        selected.forEach(lesson => selectedCounts.set(lesson.disciplina, (selectedCounts.get(lesson.disciplina) || 0) + 1));
+        const languageKeys = (config?.languages || []).filter(language => language !== 'Inglese').map(language => languageDisciplineFor(config.schoolType, language));
+        const requiredKeys = [...new Set([
+          [...requestedCounts.keys()].find(key => /matematica/i.test(key)),
+          [...requestedCounts.keys()].find(key => /^lingua inglese$/i.test(key)),
+          ...languageKeys
+        ].filter(Boolean))];
+        const activityLabel = discipline => /matematica/i.test(discipline) ? 'Svolgimento esercizi di matematica' : /inglese/i.test(discipline) ? 'Sessione di ascolto o lettura in lingua inglese' : `Esercitazione di ${discipline}`;
+        const completed = discipline => (selectedCounts.get(discipline) || 0) >= (requestedCounts.get(discipline) || 0) && (requestedCounts.get(discipline) || 0) > 0;
+        const scheduleSlot = (slot, lesson, discipline, dailyCounts) => {
+          const item = lesson || { id: `ACT-${discipline}-${isoDate(slot.date)}-${slot.slot}`, disciplina: discipline, anno: '', argomento: activityLabel(discipline), ordine: 99999, priorita: 'COMPLEMENTARE', prerequisiti: '', isActivity: true };
+          schedule.push({ ...item, date: new Date(slot.date), slot: slot.slot });
+          const dailyKey = `${isoDate(slot.date)}|${discipline}`;
+          dailyCounts.set(dailyKey, (dailyCounts.get(dailyKey) || 0) + 1);
+          lastUsed.set(discipline, sequence++);
+          previousDiscipline = discipline;
+        };
+        weeks.forEach(weekSlots => {
+          const used = new Set();
+          const activityCounts = new Map();
           const dailyCounts = new Map();
-          const target = Math.min(lessonsPerDay, dailyTargets[dayIndex]);
-          for (let slot = 1; slot <= target; slot++) {
+          requiredKeys.forEach(discipline => {
+            const queue = queues.get(discipline) || [];
+            const reserved = Math.min(3, weekSlots.length - used.size);
+            let assigned = 0;
+            for (const slot of weekSlots) {
+              if (assigned >= reserved) break;
+              const slotKey = `${isoDate(slot.date)}-${slot.slot}`;
+              if (used.has(slotKey)) continue;
+              const lesson = queue.length ? queue.shift() : null;
+              if (!lesson && !completed(discipline)) continue;
+              const activities = activityCounts.get(discipline) || 0;
+              if (!lesson && activities >= 2) continue;
+              scheduleSlot(slot, lesson, discipline, dailyCounts);
+              used.add(slotKey); assigned++;
+              if (!lesson) activityCounts.set(discipline, activities + 1);
+            }
+          });
+          weekSlots.forEach(slot => {
+            const slotKey = `${isoDate(slot.date)}-${slot.slot}`;
+            if (used.has(slotKey)) return;
             let candidates = [...queues.entries()].filter(([, queue]) => queue.length);
-            const underDailyLimit = candidates.filter(([discipline]) => (dailyCounts.get(discipline) || 0) < 2);
+            const underDailyLimit = candidates.filter(([discipline]) => (dailyCounts.get(`${isoDate(slot.date)}|${discipline}`) || 0) < 2);
             if (underDailyLimit.length) candidates = underDailyLimit;
             const alternatives = candidates.filter(([discipline]) => discipline !== previousDiscipline);
             if (alternatives.length) candidates = alternatives;
             candidates.sort(([disciplineA, queueA], [disciplineB, queueB]) =>
-              (dailyCounts.get(disciplineA) || 0) - (dailyCounts.get(disciplineB) || 0) ||
-              queueB.length - queueA.length ||
-              (lastUsed.get(disciplineA) ?? -99999) - (lastUsed.get(disciplineB) ?? -99999) ||
-              disciplineA.localeCompare(disciplineB, 'it'));
-            if (!candidates.length) break;
-            const [discipline, queue] = candidates[0];
-            const lesson = queue.shift();
-            schedule.push({ ...lesson, date: new Date(date), slot });
-            dailyCounts.set(discipline, (dailyCounts.get(discipline) || 0) + 1);
-            lastUsed.set(discipline, sequence++);
-            previousDiscipline = discipline;
-          }
+              queueB.length - queueA.length || (lastUsed.get(disciplineA) ?? -99999) - (lastUsed.get(disciplineB) ?? -99999) || disciplineA.localeCompare(disciplineB, 'it'));
+            if (candidates.length) { const [discipline, queue] = candidates[0]; scheduleSlot(slot, queue.shift(), discipline, dailyCounts); used.add(slotKey); return; }
+            const activity = requiredKeys.find(discipline => completed(discipline) && (activityCounts.get(discipline) || 0) < 2);
+            if (activity) { scheduleSlot(slot, null, activity, dailyCounts); activityCounts.set(activity, (activityCounts.get(activity) || 0) + 1); used.add(slotKey); }
+          });
         });
     
         const weekNumbers = new Map();
@@ -1035,13 +1074,13 @@
         const requested = courseLessons();
         const selectionSeed = `${config.schoolType}|${config.course}|${(config.languages || []).join(',')}|${config.dates.start}|${config.dates.end}|${config.capacity.total}`;
         const selected = selectForCapacity(requested, config.capacity.total, config.annualWeights, selectionSeed);
-        const schedule = distributeLessons(selected, config.capacity.instructionDates, config.capacity.daily);
-        const weekNumbers = new Map(config.capacity.reviewDates.map((date, index) => [weekKey(date), index + 1]));
+        const schedule = distributeLessons(selected, config.capacity.instructionDates, config.capacity.daily, config, requested);
+        const weekNumbers = new Map(config.capacity.weeklyReviewDates.map((date, index) => [weekKey(date), index + 1]));
         schedule.forEach(lesson => { lesson.week = weekNumbers.get(weekKey(lesson.date)) || lesson.week; });
-        const reviews = buildReviewDays(schedule, config.capacity.reviewDates);
+        const reviews = buildReviewDays(schedule, config.capacity.weeklyReviewDates);
         const priorityMissing = requested.filter(row => normalizePriority(row.priorita) === 'NON ASSEGNATA').length;
         const selectedIds = new Set(selected.map(item => item.id));
-        return { config, requested, selected, excluded: requested.filter(row => !selectedIds.has(row.id)), schedule, reviews, priorityMissing };
+        return { config, requested, selected, excluded: requested.filter(row => !selectedIds.has(row.id)), schedule, reviews, initialReviewDates: config.capacity.initialReviewDates, finalReviewDates: config.capacity.finalReviewDates, reviewDaysCount: config.capacity.reviewDates.length, priorityMissing };
       }
     
       const xmlEscape = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -1093,7 +1132,8 @@
         const summaryRows = [
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
           ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
-          ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)], ['Giornate di ripasso', String(plan.reviews.length)],
+          ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)], ['Giornate di ripasso', String(plan.reviewDaysCount)],
+          ['Ripasso iniziale', config.capacity.initialReviewDates.length ? `${config.capacity.initialReviewDates.length} giornate` : 'Non previsto'], ['Ripasso finale', `${config.capacity.finalReviewDates.length} giornate`],
           ['Capacità nuove lezioni', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti totali`],
           ['Lezioni richieste', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
           ['Lezioni escluse', String(plan.excluded.length)], ['Esito', status]
@@ -1105,7 +1145,7 @@
         if (plan.priorityMissing) body += paragraph(`Nota: ${plan.priorityMissing} lezioni del percorso non hanno ancora una priorità compilata. Se la capacità impone una riduzione, Janus effettua per queste righe una selezione casuale controllata e riproducibile; l’ordine didattico viene poi mantenuto nella pianificazione.`, { style: 'Note', before: 280, after: 180 });
         body += paragraph('Calendario delle lezioni', { style: 'Heading1', pageBreakBefore: true });
         const activeDays = new Set(plan.schedule.map(lesson => dayKey(lesson.date))).size;
-        body += paragraph(`Il calendario contiene ${plan.schedule.length} nuove lezioni distribuite su ${activeDays} giornate e ${plan.reviews.length} giornate di ripasso, una per ogni settimana. Le discipline vengono alternate e il carico delle nuove lezioni si adatta ai giorni rimanenti.`, { after: 220 });
+        body += paragraph(`Il calendario contiene ${plan.schedule.length} attività distribuite su ${activeDays} giornate, con ${plan.reviewDaysCount} giornate complessive di ripasso. Le discipline vengono alternate e il carico si adatta ai giorni disponibili.`, { after: 220 });
         const months = groupSchedule(plan.schedule, plan.reviews);
         const widths = [500, 1800, 600, 5260, 1200];
         const headers = ['N.', 'Disciplina', 'Anno', 'Lezione', 'Priorità'];
@@ -1324,7 +1364,10 @@
 
       function manualCompactDay(day) {
         const widths = [420, 1850, 5480, 1550];
-        let result = mParagraph(`${dayTitle(day.date)} — ${day.lessons.length} ${day.lessons.length === 1 ? 'lezione' : 'lezioni'}`, { style: 'Heading3' });
+        const lessonCount = day.lessons.filter(item => !item.isActivity).length;
+        const activityCount = day.lessons.filter(item => item.isActivity).length;
+        const activityLabel = activityCount ? ` · ${activityCount} attività` : '';
+        let result = mParagraph(`${dayTitle(day.date)} — ${lessonCount} ${lessonCount === 1 ? 'lezione' : 'lezioni'}${activityLabel}`, { style: 'Heading3' });
         result += mTable(widths, 'AEB8CF');
         result += mRow([
           mCompactCell(mParagraph('✓', { bold: true, color: 'FFFFFF', size: 16, align: 'center', after: 0 }), widths[0], '252846'),
@@ -1337,7 +1380,7 @@
           result += mRow([
             mCompactCell(mParagraph('☐', { size: 18, align: 'center', after: 0 }), widths[0], shade),
             mCompactCell(mParagraph(lesson.disciplina, { bold: true, size: 16, after: 0 }), widths[1], shade),
-            mCompactCell(mParagraph(lesson.argomento, { size: 16, after: 0 }), widths[2], shade),
+            mCompactCell(mParagraph(lesson.isActivity ? `Attività: ${lesson.argomento}` : lesson.argomento, { size: 16, after: 0 }), widths[2], shade),
             mCompactCell(mParagraph('F ☐  R ☐', { size: 15, align: 'center', after: 0 }), widths[3], shade)
           ]);
         });
@@ -1392,6 +1435,34 @@
           mParagraph('Eventuali recuperi iniziali: __________________________________________________________', { size: 19 }) +
           mParagraph('Indicazioni del tutor', { style: 'FormHeading' }) + mLines(5);
       }
+
+      function manualReviewOverview(plan) {
+        const { config } = plan;
+        let body = '';
+        if (plan.initialReviewDates.length) {
+          const firstYears = config.course === '2ª' ? 'del primo anno' : 'dei primi due anni';
+          const mathematics = config.course === '2ª'
+            ? 'numeri e calcolo, frazioni e percentuali, espressioni, equazioni di primo grado, geometria di base e lettura di dati.'
+            : 'numeri e calcolo, frazioni e percentuali, algebra, equazioni e disequazioni, geometria, funzioni di base, proporzioni, dati e probabilità.';
+          const english = config.course === '2ª'
+            ? 'parti del discorso, verbo to be e have, pronomi, articoli, aggettivi, present simple e continuous, past simple, domande, negazioni e lessico di base.'
+            : 'tempi verbali fondamentali, ausiliari e modali, pronomi e determinanti, preposizioni, comparativi, forme interrogative e negative, connettivi e lessico di base.';
+          body += mParagraph('Ripasso iniziale', { style: 'Heading1', pageBreakBefore: true });
+          body += mParagraph(`Durante le prime due settimane sono ripresi in forma sintetica i fondamentali ${firstYears}. Le attività non sono suddivise giorno per giorno: il tutor organizza il lavoro all’interno delle giornate dedicate al ripasso, prevedendo anche una giornata di recap al termine di ciascuna settimana.`, { style: 'Lead' });
+          body += mParagraph(`Matematica — ${mathematics}`, { style: 'Instruction' });
+          body += mParagraph(`Inglese — ${english}`, { style: 'Instruction' });
+          const additionalLanguages = (config.languages || []).filter(language => language !== 'Inglese');
+          const languageTopics = {
+            Francese: 'saluti e presentazioni, articoli e genere, être e avoir, presente, negazione e interrogazione, numeri, tempo e lessico quotidiano.',
+            Spagnolo: 'saluti e presentazioni, articoli e genere, ser e estar, presente, negazione e interrogazione, numeri, tempo e lessico quotidiano.',
+            Tedesco: 'saluti e presentazioni, articoli e genere, sein e haben, presente, ordine della frase, negazione, numeri, tempo e lessico quotidiano.'
+          };
+          additionalLanguages.forEach(language => body += mParagraph(`${language} — ${languageTopics[language] || 'strutture grammaticali fondamentali, lessico di base, comprensione di frasi semplici e comunicazione quotidiana.'}`, { style: 'Instruction' }));
+        }
+        body += mParagraph('Ripasso finale', { style: 'Heading1', pageBreakBefore: true });
+        body += mParagraph('Le ultime due settimane del calendario sono riservate esclusivamente al ripasso generale del percorso. Non vengono inserite nuove lezioni: lo studente consolida i contenuti svolti, recupera eventuali difficoltà e prepara la chiusura del programma con il supporto del tutor.', { style: 'Lead' });
+        return body;
+      }
     
       function buildDocumentXml(plan) {
         const { config } = plan;
@@ -1399,8 +1470,8 @@
         const summaryRows = [
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
           ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
-          ['Settimane con attività', String(config.capacity.reviewDates.length)], ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)],
-          ['Giornate di ripasso', String(plan.reviews.length)], ['Capacità', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti`],
+          ['Settimane con attività', String(config.capacity.weeklyReviewDates.length)], ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)],
+          ['Giornate di ripasso', String(plan.reviewDaysCount)], ['Ripasso iniziale/finale', `${config.capacity.initialReviewDates.length}/${config.capacity.finalReviewDates.length} giornate`], ['Capacità', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti`],
           ['Lezioni complessive', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
           ['Lezioni non inserite', String(plan.excluded.length)]
         ];
@@ -1408,6 +1479,7 @@
         body += mParagraph('Come usare il manuale', { style: 'Heading1' });
         body += mParagraph('Questo manuale accompagna lo studente durante tutto il percorso. Aiuta a registrare il lavoro, riconoscere le difficoltà e migliorare progressivamente il metodo di studio.', { style: 'Lead' });
         ['Consulta le attività previste per la giornata.', 'Contrassegna ogni lezione come svolta, non svolta o da ripassare.', 'Annota dubbi e criticità nella scheda della lezione.', 'Compila il bilancio al termine della giornata.', 'Utilizza il giorno settimanale di ripasso per consolidare gli argomenti.', 'Completa insieme al tutor la scheda di chiusura settimanale.'].forEach((item, index) => { body += mParagraph(`${index + 1}.  ${item}`, { style: 'Instruction' }); });
+        body += manualReviewOverview(plan);
         body += mParagraph('Quadro generale del percorso', { style: 'Heading1', pageBreakBefore: true }) + mSummary(summaryRows);
         body += mParagraph('Obiettivo generale del percorso', { style: 'FormHeading' }) + mLines(4);
         body += mParagraph(`Data di avvio effettiva: ________________   Data prevista di conclusione: ${formatDate(config.dates.end)}`, { size: 19 });
@@ -1538,7 +1610,7 @@
           const output = await downloadDocx(plan);
           const coverage = plan.requested.length ? Math.round(plan.selected.length / plan.requested.length * 1000) / 10 : 0;
           notice.className = 'notice visible';
-          notice.innerHTML = `<strong>Manuale operativo creato e scaricato.</strong>${output.name}: ${formatNumber(plan.selected.length)} lezioni pianificate e ${formatNumber(plan.reviews.length)} giornate di ripasso. Copertura: ${String(coverage).replace('.', ',')}% del programma. ${plan.excluded.length ? `${formatNumber(plan.excluded.length)} lezioni non rientrano nella capacità disponibile e non sono riportate nel manuale.` : 'Il programma è completo.'}`;
+          notice.innerHTML = `<strong>Manuale operativo creato e scaricato.</strong>${output.name}: ${formatNumber(plan.selected.length)} lezioni pianificate e ${formatNumber(plan.reviewDaysCount)} giornate di ripasso. Copertura: ${String(coverage).replace('.', ',')}% del programma. ${plan.excluded.length ? `${formatNumber(plan.excluded.length)} lezioni non rientrano nella capacità disponibile e non sono riportate nel manuale.` : 'Il programma è completo.'}`;
           notice.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } catch (error) {
           console.error(error);
