@@ -992,24 +992,24 @@
           lastUsed.set(discipline, sequence++);
           previousDiscipline = discipline;
         };
-        let weekIndex = 0;
         weeks.forEach(weekSlots => {
           const used = new Set();
           const activityCounts = new Map();
           const dailyCounts = new Map();
-          const firstWeek = weekIndex === 0;
-          if (firstWeek) {
-            [...queues.keys()].sort((a, b) => a.localeCompare(b, 'it')).forEach(discipline => {
-              const queue = queues.get(discipline);
-              const slot = weekSlots.find(candidate => !used.has(`${isoDate(candidate.date)}-${candidate.slot}`));
-              if (!slot || !queue?.length) return;
-              scheduleSlot(slot, queue.shift(), discipline, dailyCounts);
-              used.add(`${isoDate(slot.date)}-${slot.slot}`);
-            });
-          }
+          // Mantieni una presenza settimanale per ogni materia finché ci sono
+          // lezioni disponibili. Se una settimana parziale non ha slot
+          // sufficienti, le discipline rimaste vengono completate nella
+          // settimana successiva.
+          [...queues.keys()].sort((a, b) => a.localeCompare(b, 'it')).forEach(discipline => {
+            const queue = queues.get(discipline);
+            const slot = weekSlots.find(candidate => !used.has(`${isoDate(candidate.date)}-${candidate.slot}`));
+            if (!slot || !queue?.length) return;
+            scheduleSlot(slot, queue.shift(), discipline, dailyCounts);
+            used.add(`${isoDate(slot.date)}-${slot.slot}`);
+          });
           requiredKeys.forEach(discipline => {
             const queue = queues.get(discipline) || [];
-            const reserved = Math.min(firstWeek ? 2 : 3, weekSlots.length - used.size);
+            const reserved = Math.min(2, weekSlots.length - used.size);
             let assigned = 0;
             for (const slot of weekSlots) {
               if (assigned >= reserved) break;
@@ -1038,7 +1038,6 @@
             const activity = requiredKeys.find(discipline => completed(discipline) && (activityCounts.get(discipline) || 0) < 2);
             if (activity) { scheduleSlot(slot, null, activity, dailyCounts); activityCounts.set(activity, (activityCounts.get(activity) || 0) + 1); used.add(slotKey); }
           });
-          weekIndex++;
         });
     
         const weekNumbers = new Map();
@@ -1115,24 +1114,33 @@
       const shortDate = date => new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(date);
     
       function groupSchedule(schedule, reviews) {
-        const months = [];
         const events = [
           ...schedule.map(lesson => ({ type: 'lesson', date: lesson.date, week: lesson.week, lesson })),
           ...reviews.map(review => ({ type: 'review', date: review.date, week: review.week, review }))
         ].sort((a, b) => a.date - b.date || (a.type === 'lesson' ? -1 : 1));
+        const weeks = new Map();
         events.forEach(event => {
-          const mKey = monthKey(event.date);
-          let month = months.find(item => item.key === mKey);
-          if (!month) { month = { key: mKey, date: event.date, lessons: [], reviews: [], weeks: [] }; months.push(month); }
-          if (event.type === 'lesson') month.lessons.push(event.lesson); else month.reviews.push(event.review);
           const wKey = weekKey(event.date);
-          let week = month.weeks.find(item => item.key === wKey);
-          if (!week) { week = { key: wKey, number: event.week, lessons: [], reviews: [], days: [] }; month.weeks.push(week); }
+          let week = weeks.get(wKey);
+          if (!week) { week = { key: wKey, number: event.week, lessons: [], reviews: [], days: [] }; weeks.set(wKey, week); }
           if (event.type === 'lesson') week.lessons.push(event.lesson); else week.reviews.push(event.review);
           const dKey = dayKey(event.date);
           let day = week.days.find(item => item.key === dKey);
           if (!day) { day = { key: dKey, date: event.date, lessons: [], review: null }; week.days.push(day); }
           if (event.type === 'lesson') day.lessons.push(event.lesson); else day.review = event.review;
+        });
+        const months = [];
+        [...weeks.values()].sort((a, b) => a.key.localeCompare(b.key)).forEach(week => {
+          // Il mese della sezione è quello del lunedì di inizio settimana:
+          // così una settimana a cavallo di due mesi resta indivisa.
+          const weekStart = new Date(`${week.key}T12:00:00`);
+          const mKey = monthKey(weekStart);
+          let month = months.find(item => item.key === mKey);
+          if (!month) { month = { key: mKey, date: weekStart, lessons: [], reviews: [], weeks: [] }; months.push(month); }
+          week.days.sort((a, b) => a.date - b.date);
+          month.weeks.push(week);
+          month.lessons.push(...week.lessons);
+          month.reviews.push(...week.reviews);
         });
         return months;
       }
