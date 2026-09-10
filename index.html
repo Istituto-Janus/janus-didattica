@@ -982,7 +982,7 @@
           [...requestedCounts.keys()].find(key => /^lingua inglese$/i.test(key)),
           ...languageKeys
         ].filter(Boolean))];
-        const activityLabel = discipline => /matematica/i.test(discipline) ? 'Svolgimento esercizi di matematica' : /inglese/i.test(discipline) ? 'Sessione di ascolto o lettura in lingua inglese' : `Esercitazione di ${discipline}`;
+        const activityLabel = discipline => /matematica/i.test(discipline) ? 'Svolgimento esercizi di matematica' : /inglese/i.test(discipline) ? 'Sessione di ascolto o lettura in lingua inglese' : config?.schoolType === 'Liceo Linguistico' ? `Ripasso ed esercitazione di ${discipline}` : `Esercitazione di ${discipline}`;
         const completed = discipline => (selectedCounts.get(discipline) || 0) >= (requestedCounts.get(discipline) || 0) && (requestedCounts.get(discipline) || 0) > 0;
         const scheduleSlot = (slot, lesson, discipline, dailyCounts) => {
           const item = lesson || { id: `ACT-${discipline}-${isoDate(slot.date)}-${slot.slot}`, disciplina: discipline, anno: '', argomento: activityLabel(discipline), ordine: 99999, priorita: 'COMPLEMENTARE', prerequisiti: '', isActivity: true };
@@ -992,13 +992,24 @@
           lastUsed.set(discipline, sequence++);
           previousDiscipline = discipline;
         };
+        let weekIndex = 0;
         weeks.forEach(weekSlots => {
           const used = new Set();
           const activityCounts = new Map();
           const dailyCounts = new Map();
+          const firstWeek = weekIndex === 0;
+          if (firstWeek) {
+            [...queues.keys()].sort((a, b) => a.localeCompare(b, 'it')).forEach(discipline => {
+              const queue = queues.get(discipline);
+              const slot = weekSlots.find(candidate => !used.has(`${isoDate(candidate.date)}-${candidate.slot}`));
+              if (!slot || !queue?.length) return;
+              scheduleSlot(slot, queue.shift(), discipline, dailyCounts);
+              used.add(`${isoDate(slot.date)}-${slot.slot}`);
+            });
+          }
           requiredKeys.forEach(discipline => {
             const queue = queues.get(discipline) || [];
-            const reserved = Math.min(3, weekSlots.length - used.size);
+            const reserved = Math.min(firstWeek ? 2 : 3, weekSlots.length - used.size);
             let assigned = 0;
             for (const slot of weekSlots) {
               if (assigned >= reserved) break;
@@ -1027,6 +1038,7 @@
             const activity = requiredKeys.find(discipline => completed(discipline) && (activityCounts.get(discipline) || 0) < 2);
             if (activity) { scheduleSlot(slot, null, activity, dailyCounts); activityCounts.set(activity, (activityCounts.get(activity) || 0) + 1); used.add(slotKey); }
           });
+          weekIndex++;
         });
     
         const weekNumbers = new Map();
