@@ -1438,6 +1438,7 @@
 
       function manualReviewOverview(plan) {
         const { config } = plan;
+        const range = dates => dates.length ? ` dal ${formatDate(dates[0])} al ${formatDate(dates[dates.length - 1])}` : '';
         let body = '';
         if (plan.initialReviewDates.length) {
           const firstYears = config.course === '2ª' ? 'del primo anno' : 'dei primi due anni';
@@ -1448,7 +1449,7 @@
             ? 'parti del discorso, verbo to be e have, pronomi, articoli, aggettivi, present simple e continuous, past simple, domande, negazioni e lessico di base.'
             : 'tempi verbali fondamentali, ausiliari e modali, pronomi e determinanti, preposizioni, comparativi, forme interrogative e negative, connettivi e lessico di base.';
           body += mParagraph('Ripasso iniziale', { style: 'Heading1', pageBreakBefore: true });
-          body += mParagraph(`Durante le prime due settimane sono ripresi in forma sintetica i fondamentali ${firstYears}. Le attività non sono suddivise giorno per giorno: il tutor organizza il lavoro all’interno delle giornate dedicate al ripasso, prevedendo anche una giornata di recap al termine di ciascuna settimana.`, { style: 'Lead' });
+          body += mParagraph(`Durante le prime due settimane${range(plan.initialReviewDates)} sono ripresi in forma sintetica i fondamentali ${firstYears}. Le attività non sono suddivise giorno per giorno: il tutor organizza il lavoro all’interno delle giornate dedicate al ripasso, prevedendo anche una giornata di recap al termine di ciascuna settimana.`, { style: 'Lead' });
           body += mParagraph(`Matematica — ${mathematics}`, { style: 'Instruction' });
           body += mParagraph(`Inglese — ${english}`, { style: 'Instruction' });
           const additionalLanguages = (config.languages || []).filter(language => language !== 'Inglese');
@@ -1460,7 +1461,7 @@
           additionalLanguages.forEach(language => body += mParagraph(`${language} — ${languageTopics[language] || 'strutture grammaticali fondamentali, lessico di base, comprensione di frasi semplici e comunicazione quotidiana.'}`, { style: 'Instruction' }));
         }
         body += mParagraph('Ripasso finale', { style: 'Heading1', pageBreakBefore: true });
-        body += mParagraph('Le ultime due settimane del calendario sono riservate esclusivamente al ripasso generale del percorso. Non vengono inserite nuove lezioni: lo studente consolida i contenuti svolti, recupera eventuali difficoltà e prepara la chiusura del programma con il supporto del tutor.', { style: 'Lead' });
+        body += mParagraph(`Le ultime due settimane del calendario${range(plan.finalReviewDates)} sono riservate esclusivamente al ripasso generale del percorso. Non vengono inserite nuove lezioni: lo studente consolida i contenuti svolti, recupera eventuali difficoltà e prepara la chiusura del programma con il supporto del tutor.`, { style: 'Lead' });
         return body;
       }
     
