@@ -147,6 +147,10 @@
     .percent-wrap span { position: absolute; right: 14px; top: 12px; color: var(--muted); }
 
     .capacity-note { grid-column: 1 / -1; display: flex; gap: 10px; color: #38516d; background: #edf6f8; border: 1px solid #d2e9ec; border-radius: 10px; padding: 12px 14px; font-size: .84rem; }
+    .review-option { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 11px; padding: 14px; border: 1px solid #d7e5f5; border-radius: 10px; background: #f7faff; color: #38516d; }
+    .review-option input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--navy); }
+    .review-option label { margin: 0; color: var(--navy); font-size: .86rem; }
+    .review-option p { margin: 3px 0 0; color: var(--muted); font-size: .77rem; font-weight: 400; }
     .info-icon { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: var(--teal); font-size: .72rem; font-weight: 800; }
     .workspace-panel { grid-column: 1 / -1; margin-top: 4px; padding: 17px; border: 1px solid #d7e5f5; background: #f7faff; border-radius: 12px; }
     .workspace-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -412,6 +416,13 @@
             <input type="number" id="daysPerWeek" name="daysPerWeek" min="2" max="7" value="5" required>
             <p class="hint">Da 2 a 7 giorni: l’ultimo è sempre dedicato al ripasso.</p><p class="error" id="daysPerWeekError"></p>
           </div>
+          <div class="review-option">
+            <input type="checkbox" id="initialReviewEnabled" name="initialReviewEnabled" checked>
+            <div>
+              <label for="initialReviewEnabled">Prevedere le due settimane iniziali di ripasso</label>
+              <p>Preselezionato. Il tutor può disattivarlo quando lo studente deve iniziare subito il programma ordinario. L’opzione non modifica le due settimane finali di ripasso.</p>
+            </div>
+          </div>
           <div class="capacity-note">
             <span class="info-icon" aria-hidden="true">i</span>
             <span>Janus riserva sempre un giorno a settimana al ripasso e ridistribuisce le nuove lezioni sugli altri giorni, mantenendo priorità, ordine e alternanza delle materie.</span>
@@ -484,7 +495,7 @@
         'Liceo Scientifico — Scienze Applicate': '1BzAS-Kwb0qhjkkY6IaejFYB6Q3eBiAosRnuaRsp5Cvc',
         'Liceo Classico': '1zFpspP8uXeONVmiQGAYxb_H8-CVtZNDjRur1ig2fX8U',
         'Liceo Linguistico': '1wAiHmys5_TpQMXHMypHc8NR-weyQHP_LSpw47qnEcUY',
-        'Liceo delle Scienze Umane': '17HdGCXMA21NjD_18XEXOsA4-KTb-Ne3KMpBu7WspOC4',
+        'Liceo delle Scienze Umane': '1oTNLv60sZf77r13N9-iraHoV8P9YA8a0eDuIXunoxs0',
         'Liceo Economico-Sociale': '1ZJfR-WNNS7E04sgVGvyITSMqRWiR-zNPv7HE51-dDOo',
         'Informatica e Telecomunicazioni — articolazione Informatica': '1_cXD3_sf5MdTO-xbYfTvNbBOH7rQoIvRE4wn1BTpkxQ',
         'Amministrazione, Finanza e Marketing': '1QUZfYSkK-dh_ieOrD8Ez7DmA28XeC6Rxb-976cXxIl8',
@@ -506,7 +517,8 @@
         endDate: document.getElementById('endDate'), lessonsPerDay: document.getElementById('lessonsPerDay'),
         daysPerWeek: document.getElementById('daysPerWeek'), weightFirst: document.getElementById('weightFirst'),
         weightSecond: document.getElementById('weightSecond'), googleClientId: document.getElementById('googleClientId'),
-        secondLanguage: document.getElementById('secondLanguage'), thirdLanguage: document.getElementById('thirdLanguage')
+        secondLanguage: document.getElementById('secondLanguage'), thirdLanguage: document.getElementById('thirdLanguage'),
+        initialReviewEnabled: document.getElementById('initialReviewEnabled')
       };
       const weightsPanel = document.getElementById('weightsPanel');
       const languagePanel = document.getElementById('languagePanel');
@@ -729,7 +741,7 @@
       }
     
       function splitStudyDates(studyDates) {
-        const initialReviewDates = ['1ª', '1ª/2ª'].includes(fields.course.value) ? [] : studyDates.slice(0, 10);
+        const initialReviewDates = fields.initialReviewEnabled?.checked !== false && !['1ª', '1ª/2ª'].includes(fields.course.value) ? studyDates.slice(0, 10) : [];
         const finalStart = Math.max(initialReviewDates.length, studyDates.length - 10);
         const finalReviewDates = studyDates.slice(finalStart);
         const coreDates = studyDates.slice(initialReviewDates.length, finalStart);
@@ -1076,6 +1088,7 @@
         return {
           student: { firstName: safeText(fields.studentName.value), lastName: safeText(fields.studentSurname.value) },
           tutor: safeText(fields.tutorName.value), schoolType: fields.schoolType.value, course: fields.course.value, languages: selectedLanguages(),
+          initialReviewEnabled: fields.initialReviewEnabled?.checked !== false,
           years, dates: { start: fields.startDate.value, end: fields.endDate.value }, capacity,
           annualWeights: years.length === 2 ? { [years[0]]: Number(fields.weightFirst.value), [years[1]]: Number(fields.weightSecond.value) } : null
         };
@@ -1153,7 +1166,7 @@
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
           ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
           ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)], ['Giornate di ripasso', String(plan.reviewDaysCount)],
-          ['Ripasso iniziale', config.capacity.initialReviewDates.length ? `${config.capacity.initialReviewDates.length} giornate` : 'Non previsto'], ['Ripasso finale', `${config.capacity.finalReviewDates.length} giornate`],
+          ['Ripasso iniziale', config.capacity.initialReviewDates.length ? `${config.capacity.initialReviewDates.length} giornate` : (config.initialReviewEnabled ? 'Non previsto per il percorso' : 'Escluso dal tutor')], ['Ripasso finale', `${config.capacity.finalReviewDates.length} giornate`],
           ['Capacità nuove lezioni', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti totali`],
           ['Lezioni richieste', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
           ['Lezioni escluse', String(plan.excluded.length)], ['Esito', status]
@@ -1479,6 +1492,12 @@
             Tedesco: 'saluti e presentazioni, articoli e genere, sein e haben, presente, ordine della frase, negazione, numeri, tempo e lessico quotidiano.'
           };
           additionalLanguages.forEach(language => body += mParagraph(`${language} — ${languageTopics[language] || 'strutture grammaticali fondamentali, lessico di base, comprensione di frasi semplici e comunicazione quotidiana.'}`, { style: 'Instruction' }));
+        } else {
+          body += mParagraph('Ripasso iniziale', { style: 'Heading1', pageBreakBefore: true });
+          const explanation = config.initialReviewEnabled
+            ? 'Il ripasso iniziale non è previsto per il percorso selezionato. Il programma ordinario inizia dalla prima giornata utile.'
+            : 'Il tutor ha scelto di non inserire le due settimane iniziali di ripasso. Il programma ordinario inizia dalla prima giornata utile.';
+          body += mParagraph(explanation, { style: 'Lead' });
         }
         body += mParagraph('Ripasso finale', { style: 'Heading1', pageBreakBefore: true });
         body += mParagraph(`Le ultime due settimane del calendario${range(plan.finalReviewDates)} sono riservate esclusivamente al ripasso generale del percorso. Non vengono inserite nuove lezioni: lo studente consolida i contenuti svolti, recupera eventuali difficoltà e prepara la chiusura del programma con il supporto del tutor.`, { style: 'Lead' });
@@ -1492,7 +1511,7 @@
           ['Studente', `${config.student.firstName} ${config.student.lastName}`], ['Tutor', config.tutor],
           ['Indirizzo e percorso', `${config.schoolType} — ${config.course}`], ['Lingue', config.languages?.join(' · ') || 'Non applicabile'], ['Periodo', `${formatDate(config.dates.start)} — ${formatDate(config.dates.end)}`],
           ['Settimane con attività', String(config.capacity.weeklyReviewDates.length)], ['Giorni per nuove lezioni', String(config.capacity.instructionDates.length)],
-          ['Giornate di ripasso', String(plan.reviewDaysCount)], ['Ripasso iniziale/finale', `${config.capacity.initialReviewDates.length}/${config.capacity.finalReviewDates.length} giornate`], ['Capacità', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti`],
+          ['Giornate di ripasso', String(plan.reviewDaysCount)], ['Ripasso iniziale/finale', `${config.capacity.initialReviewDates.length ? `${config.capacity.initialReviewDates.length} giornate` : (config.initialReviewEnabled ? 'non previsto' : 'escluso dal tutor')} / ${config.capacity.finalReviewDates.length} giornate`], ['Capacità', `${config.capacity.daily} lezioni/giorno · ${config.capacity.total} posti`],
           ['Lezioni complessive', String(plan.requested.length)], ['Lezioni pianificate', `${plan.selected.length} (${String(coverage).replace('.', ',')}%)`],
           ['Lezioni non inserite', String(plan.excluded.length)]
         ];
