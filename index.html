@@ -543,21 +543,23 @@
         return fields.course.value ? [fields.course.value] : [];
       };
       const LANGUAGE_OPTIONS = ['Francese', 'Spagnolo', 'Tedesco'];
-      const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)', 'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)', 'Turismo', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
+      const TWO_LANGUAGE_COURSES = new Set(['Liceo Economico-Sociale', 'Amministrazione, Finanza e Marketing', 'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)', 'Servizi per la sanità e l’assistenza sociale', 'Enogastronomia e ospitalità alberghiera']);
+      const THREE_LANGUAGE_COURSES = new Set(['Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)', 'Turismo']);
       const LANGUAGE_COURSE_OPTIONS = {
         'Liceo Economico-Sociale': ['Francese', 'Spagnolo'],
         'Amministrazione, Finanza e Marketing': ['Francese', 'Spagnolo'],
-        'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)': ['Francese', 'Spagnolo'],
+        'Amministrazione, Finanza e Marketing — articolazione Relazioni Internazionali (RIM)': LANGUAGE_OPTIONS,
         'Amministrazione, Finanza e Marketing — articolazione Sistemi Informativi Aziendali (SIA)': ['Francese', 'Spagnolo'],
         'Turismo': LANGUAGE_OPTIONS,
         'Servizi per la sanità e l’assistenza sociale': ['Francese', 'Spagnolo'],
         'Enogastronomia e ospitalità alberghiera': ['Francese', 'Spagnolo']
       };
-      const languageCourse = () => fields.schoolType.value === 'Liceo Linguistico' || TWO_LANGUAGE_COURSES.has(fields.schoolType.value);
+      const languageCourse = () => fields.schoolType.value === 'Liceo Linguistico' || TWO_LANGUAGE_COURSES.has(fields.schoolType.value) || THREE_LANGUAGE_COURSES.has(fields.schoolType.value);
       const isLinguistic = () => fields.schoolType.value === 'Liceo Linguistico';
+      const requiresThirdLanguage = () => isLinguistic() || THREE_LANGUAGE_COURSES.has(fields.schoolType.value);
       const selectedLanguages = () => {
         if (!languageCourse()) return [];
-        return ['Inglese', safeText(fields.secondLanguage?.value), ...(isLinguistic() ? [safeText(fields.thirdLanguage?.value)] : [])].filter(Boolean);
+        return ['Inglese', safeText(fields.secondLanguage?.value), ...(requiresThirdLanguage() ? [safeText(fields.thirdLanguage?.value)] : [])].filter(Boolean);
       };
       const languageDiscipline = value => safeText(value).toLocaleLowerCase('it-IT');
       const isForeignLanguageDiscipline = value => /^(lingua inglese|lingua francese|lingua spagnola|lingua tedesca|seconda lingua|lingua e cultura straniera)/i.test(safeText(value));
@@ -593,8 +595,8 @@
         const previousSecond = fields.secondLanguage?.value || '';
         populateLanguageSelect(fields.secondLanguage, options, 'Seleziona la seconda lingua', previousSecond);
         fields.secondLanguage?.setAttribute('required', '');
-        if (isLinguistic()) {
-          languageDescription.textContent = 'L’inglese è sempre previsto. Seleziona le altre due lingue effettivamente attivate.';
+        if (requiresThirdLanguage()) {
+          languageDescription.textContent = isLinguistic() ? 'L’inglese è sempre previsto. Seleziona le altre due lingue effettivamente attivate.' : 'L’inglese è sempre previsto. Seleziona la seconda e la terza lingua effettivamente attivate.';
           thirdLanguageField.hidden = false;
           const previousThird = fields.thirdLanguage?.value || '';
           populateLanguageSelect(fields.thirdLanguage, options.filter(option => option !== fields.secondLanguage.value), 'Seleziona la terza lingua', previousThird);
@@ -763,7 +765,7 @@
       function courseLessons() {
         const years = selectedYears();
         const selected = selectedLanguages();
-        if (languageCourse() && selected.length < (isLinguistic() ? 3 : 2)) return [];
+        if (languageCourse() && selected.length < (requiresThirdLanguage() ? 3 : 2)) return [];
         const languages = selected.map(language => languageDisciplineFor(fields.schoolType.value, language));
         return CATALOG.filter(row => {
           if (!years.includes(row.anno)) return false;
@@ -884,7 +886,7 @@
           const secondValid = Boolean(safeText(fields.secondLanguage.value));
           setError('secondLanguage', secondValid ? '' : 'Seleziona la seconda lingua.');
           valid = valid && secondValid;
-          if (isLinguistic()) {
+          if (requiresThirdLanguage()) {
             const thirdValid = Boolean(safeText(fields.thirdLanguage.value)) && fields.thirdLanguage.value !== fields.secondLanguage.value;
             setError('thirdLanguage', thirdValid ? '' : 'Seleziona una terza lingua diversa dalla seconda.');
             valid = valid && thirdValid;
